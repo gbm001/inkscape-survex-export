@@ -60,6 +60,30 @@ def measure(steps):
     return distance(steps[0][1], steps[1][1])
 
 
+def path_to_steps(path):
+    """Convert a path to a series of steps.
+    path_in is a tuple of a path name and a series of path instructions.
+    Returns a series of points.
+    """
+    path_segs = Path(path[1]).to_absolute()
+    steps = []
+    for seg in path_segs:
+        if len(seg.args) > 2:
+            raise PathError('Over-complicated path segments')
+        if seg.letter in ('M', 'L'):
+            x, y = seg.args
+        elif seg.letter == 'H':
+            x = seg.args[-1]
+        elif seg.letter == 'V':
+            y = seg.args[-1]
+        elif seg.letter == 'Z':
+            x, y = path_segs[0].args
+        else:
+            raise PathError('Unknown segment type')
+        steps.append((x, y))
+    return steps
+
+
 class SurvexOutputExtension(inkex.extensions.OutputExtension):
     def add_arguments(self, pars):
         pars.add_argument('--tab', type=str, dest='tab', default='',
@@ -206,12 +230,12 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         for path in paths:
             legs = []
-            steps = Path(path[1]).to_arrays()
+            steps = path_to_steps(path)
             for i, step in enumerate(steps):
-                stations.append((step[1][0], step[1][1], path[0], i))
+                stations.append((step[0], step[1], path[0], i))
                 if i == 0:
                     continue
-                dx, dy, dl = distance(steps[i-1][1], step[1])
+                dx, dy, dl = distance(steps[i-1], step)
                 tape = scalefac * dl
                 compass = self.options.north + math.degrees(
                     math.atan2(ex*dx+ey*dy, nx*dx+ny*dy))
