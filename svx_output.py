@@ -151,7 +151,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         # Find the orientation line.
 
-        subpaths = filter(lambda path: path[2] == self.options.cnorth, paths)
+        subpaths = [path for path in paths if path[2] == self.options.cnorth]
 
         if not subpaths:
             msg = f'No orientation line found of color {self.options.cnorth}'
@@ -167,7 +167,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         # Find the scale bar line
 
-        subpaths = filter(lambda path: path[2] == self.options.cscale, paths)
+        subpaths = [path for path in paths if path[2] == self.options.cscale]
 
         if not subpaths:
             msg = f'No scale bar line found of color {self.options.cscale}'
@@ -181,14 +181,14 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         # Find the exportable (poly)lines
 
-        paths = filter(lambda path: path[2] == self.options.cpaths, paths)
+        paths = [path for path in paths if path[2] == self.options.cpaths]
 
         if not paths:
             msg = f'No exportable lines found of color {self.options.cpaths}'
             raise PathError(msg)
 
         if self.options.layer != '':
-            paths = filter(lambda path: path[3] == self.options.layer, paths)
+            paths = [path for path in paths if path[3] == self.options.layer]
             if not paths:
                 msg = (f'No exportable lines found of color {self.options.cpaths} '
                        + f'in layer {self.options.layer}')
