@@ -32,6 +32,6 @@
     <_filetypetooltip>Export paths to survex file</_filetypetooltip>
   </output>
   <script>
-    <command reldir="extensions" interpreter="python">svx_output.py</command>
+    <command reldir="extensions" interpreter="python3">svx_output.py</command>
   </script>
 </inkscape-extension>
