@@ -57,15 +57,16 @@ def distance(p1, p2):
 
 def measure(steps):
     "Measure the distance between first two steps"
-    return distance(steps[0][1], steps[1][1])
+    return distance(steps[0], steps[1])
 
 
 def path_to_steps(path):
     """Convert a path to a series of steps.
-    path_in is a tuple of a path name and a series of path instructions.
+    path_in is a tuple where the second element is a Path object.
     Returns a series of points.
     """
-    path_segs = Path(path[1]).to_absolute()
+    path_segs = path[1]
+
     steps = []
     for seg in path_segs:
         if len(seg.args) > 2:
@@ -119,11 +120,8 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         # work on Windows.  Therefore the actual statements used are kludges
         # which use a named argument in a string format.
 
-        #e.options = e.arg_parser.parse_args()
-
         # Find out some basic properties
 
-        #e.load_raw()
         svg = self.document.getroot()
         inkex_sodipodi = inkex.NSS['sodipodi']
         inkex_svg = inkex.NSS['svg']
@@ -163,7 +161,8 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         for line in lines:
             stroke = dict(inkex.Style.parse_str(line.attrib['style']))['stroke']
             layer = line.getparent().attrib[f'{{{inkex_inkscape}}}label']
-            paths.append((line.attrib['id'], line.attrib['d'], stroke, layer))
+            path_obj = Path(line.attrib['d']).to_absolute()
+            paths.append((line.attrib['id'], path_obj, stroke, layer))
 
         # We extract the information from the paths and raise a PathError
         # exception if there is a problem.  This is caught (at the end) and
@@ -180,14 +179,17 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         if not subpaths:
             msg = f'No orientation line found of color {self.options.cnorth}'
             raise PathError(msg)
+        if len(subpaths) > 1:
+            msg = f'Multiple orientation lines of color {self.options.cnorth}'
+            raise PathError(msg)
 
-        # Construct the unit vector (nx, ny) to point along N, and the unit
-        # (ex, ey) to point along E.  We correct for north later.
+        # Find the bearing of 'north' on the SVG
 
-        steps = Path(subpaths[0][1]).to_arrays()
+        steps = path_to_steps(subpaths[0])
         dx, dy, dl = measure(steps)
-        nx, ny = dx/dl, dy/dl
-        ex, ey = -ny, nx
+        # Negative dy as y coordinates of SVG are reversed
+        north_bearing = math.degrees(math.atan2(dx, -dy) - self.options.north)
+        north_bearing %= 360.0
 
         # Find the scale bar line
 
@@ -196,10 +198,13 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         if not subpaths:
             msg = f'No scale bar line found of color {self.options.cscale}'
             raise PathError(msg)
+        if len(subpaths) > 1:
+            msg = f'Multiple scale bar lines of color {self.options.cscale}'
+            raise PathError(msg)
 
         # Calculate the scale factor
 
-        steps = Path(subpaths[0][1]).to_arrays()
+        steps = path_to_steps(subpaths[0])
         scalelen = measure(steps)[2]
         scalefac = self.options.scale / scalelen
 
@@ -211,12 +216,19 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             msg = f'No exportable lines found of color {self.options.cpaths}'
             raise PathError(msg)
 
-        if self.options.layer != '':
+        if self.options.layer:
             paths = [path for path in paths if path[3] == self.options.layer]
             if not paths:
                 msg = (f'No exportable lines found of color {self.options.cpaths} '
                        + f'in layer {self.options.layer}')
                 raise PathError(msg)
+
+        # Scale and rotate all paths by the scale factor and north bearing
+        for path in paths:
+            # Important to rotate before flipping y axis
+            path[1].rotate(-north_bearing, center=(0.0, 0.0), inplace=True)
+            # SVG y coordinates are reversed, so scale by negative
+            path[1].scale(scalefac, -scalefac, inplace=True)
 
         # Now build the survex traverses.  Keep track of stations and
         # absolute positions to identify equates and exports.
@@ -236,9 +248,10 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                 if i == 0:
                     continue
                 dx, dy, dl = distance(steps[i-1], step)
-                tape = scalefac * dl
-                compass = self.options.north + math.degrees(
-                    math.atan2(ex*dx+ey*dy, nx*dx+ny*dy))
+                tape = dl  # scalefac * dl
+                compass = math.degrees(math.atan2(dx, dy))
+                #compass = self.options.north + math.degrees(
+                    #math.atan2(ex*dx+ey*dy, nx*dx+ny*dy))
                 legs.append((i-1, i, tape, compass))
             traverses.append((path[0], legs))
 
@@ -310,8 +323,9 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         print(f'; generated {strftime("%c")}\n')
 
-        print(f'; SVG orientation: ({nx}, {ny}) is {sprintd(self.options.north)}')
-        print(f'; SVG orientation: ({ex}, {ey}) is {sprintd(self.options.north + 90)}')
+        #print(f'; SVG orientation: ({nx}, {ny}) is {sprintd(self.options.north)}')
+        #print(f'; SVG orientation: ({ex}, {ey}) is {sprintd(self.options.north + 90)}')
+        print(f'; SVG orientation: North is {north_bearing} degrees')
         print(f'; SVG scale: {scalelen} is {self.options.scale} m, scale factor = {scalefac}')
         print(f'; SVG contained {ntraverse} traverses and {nstation} stations')
         print(f'; tolerance for identifying equates = {self.options.tol} m\n')
