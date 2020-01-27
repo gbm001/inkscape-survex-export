@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 svx_output.py
 Python script for exporting survex (.svx) file from Inkscape
@@ -22,22 +22,29 @@ along with this program.  If not, see
 <http://www.gnu.org/licenses/>.
 """
 
-import os, sys, math
+import os
+import sys
+import math
 from time import strftime
 from itertools import combinations
 import inkex, simplepath, simplestyle
 
 # Define a (trivial) exception class to catch path errors
 
+
 class PathError(Exception):
     pass
 
+
 def sprintd(b):
     "Takes a bearing and returns it as string in 000 format"
-    while b < 0: b += 360
+    while b < 0:
+        b += 360
     b = int(b + 0.5)
-    while b >= 360: b -= 360
+    while b >= 360:
+        b -= 360
     return '%03i' % b
+
 
 def distance(p1, p2):
     "Calculate the distance between two points"
@@ -46,45 +53,47 @@ def distance(p1, p2):
     dl = math.sqrt(dx*dx + dy*dy)
     return dx, dy, dl
 
+
 def measure(steps):
     "Measure the distance between first two steps"
     return distance(steps[0][1], steps[1][1])
+
 
 msg = None
 
 e = inkex.Effect()
 
-e.OptionParser.add_option('--tab', action = 'store',
-                          type = 'string', dest = 'tab', default = '',
-                          help = 'Dummy argument')
+e.OptionParser.add_option('--tab', action='store',
+                          type='string', dest='tab', default='',
+                          help='Dummy argument')
 
-e.OptionParser.add_option('--scale', action = 'store',
-                          type = 'float', dest = 'scale', default = '100.0',
-                          help = 'Length of scale bar (in m)')
+e.OptionParser.add_option('--scale', action='store',
+                          type='float', dest='scale', default='100.0',
+                          help='Length of scale bar (in m)')
 
-e.OptionParser.add_option('--north', action = 'store',
-                          type = 'float', dest = 'north', default = '0.0',
-                          help = 'Bearing for orientation line (in degrees)')
-        
-e.OptionParser.add_option('--tol', action = 'store',
-                          type = 'float', dest = 'tol', default = '0.2',
-                          help = 'Tolerance to equate stations (in m)')
+e.OptionParser.add_option('--north', action='store',
+                          type='float', dest='north', default='0.0',
+                          help='Bearing for orientation line (in degrees)')
 
-e.OptionParser.add_option('--layer', action = 'store',
-                          type = 'string', dest = 'layer', default = '',
-                          help = 'Restrict conversion to a named layer')
+e.OptionParser.add_option('--tol', action='store',
+                          type='float', dest='tol', default='0.2',
+                          help='Tolerance to equate stations (in m)')
 
-e.OptionParser.add_option('--cpaths', action = 'store',
-                          type = 'string', dest = 'cpaths', default = '#ff0000',
-                          help = 'Color of (poly)lines for export (default #ff0000)')
+e.OptionParser.add_option('--layer', action='store',
+                          type='string', dest='layer', default='',
+                          help='Restrict conversion to a named layer')
 
-e.OptionParser.add_option('--cnorth', action = 'store',
-                          type = 'string', dest = 'cnorth', default = '#00ff00',
-                          help = 'Color of orientation line (default #00ff00)')
+e.OptionParser.add_option('--cpaths', action='store',
+                          type='string', dest='cpaths', default='#ff0000',
+                          help='Color of (poly)lines for export (default #ff0000)')
 
-e.OptionParser.add_option('--cscale', action = 'store',
-                          type = 'string', dest = 'cscale', default = '#0000ff',
-                          help = 'Color of scale bar line (default #0000ff)')
+e.OptionParser.add_option('--cnorth', action='store',
+                          type='string', dest='cnorth', default='#00ff00',
+                          help='Color of orientation line (default #00ff00)')
+
+e.OptionParser.add_option('--cscale', action='store',
+                          type='string', dest='cscale', default='#0000ff',
+                          help='Color of scale bar line (default #0000ff)')
 
 e.getoptions()
 
@@ -114,10 +123,10 @@ else:
     toplevel = e.options.layer
 
 # el = svg.find('.//svg:image', namespaces=inkex.NSS)
-el = svg.find('.//{%(svg)s}image' % {'svg':inkex.NSS[u'svg']})
+el = svg.find('.//{%(svg)s}image' % {'svg': inkex.NSS[u'svg']})
 
 s = '{%s}absref' % inkex.NSS[u'sodipodi']
-    
+
 if el is not None and s in el.attrib:
     imgfile = os.path.split(el.attrib[s])[1]
 else:
@@ -126,12 +135,12 @@ else:
 # Find all the (poly)lines in the document
 
 # list = svg.findall('.//svg:g/svg:path', namespaces=inkex.NSS)
-lines = svg.findall('.//{%(svg)s}g/{%(svg)s}path' % {'svg':inkex.NSS[u'svg']})
+lines = svg.findall('.//{%(svg)s}g/{%(svg)s}path' % {'svg': inkex.NSS[u'svg']})
 
 # Paths is a list of tuples (id, d, stroke, layer)
 
-paths = [] 
-  
+paths = []
+
 for line in lines:
     stroke = simplestyle.parseStyle(line.attrib['style'])['stroke']
     layer = line.getparent().attrib['{%s}label' % inkex.NSS[u'inkscape']]
@@ -188,7 +197,8 @@ try:
     if e.options.layer != '':
         paths = filter(lambda path: path[3] == e.options.layer, paths)
         if not paths:
-            msg = 'No exportable lines found of color %s in layer %s' % (e.options.cpaths, e.options.layer)
+            msg = 'No exportable lines found of color %s in layer %s' % (
+                e.options.cpaths, e.options.layer)
             raise PathError
 
 # Now build the survex traverses.  Keep track of stations and
@@ -206,7 +216,8 @@ try:
         steps = simplepath.parsePath(path[1])
         for i, step in enumerate(steps):
             stations.append((step[1][0], step[1][1], path[0], i))
-            if i == 0: continue
+            if i == 0:
+                continue
             dx, dy, dl = distance(steps[i-1][1], step[1])
             tape = scalefac * dl
             compass = e.options.north + math.degrees(math.atan2(ex*dx+ey*dy, nx*dx+ny*dy))
@@ -266,47 +277,50 @@ try:
 # export then the list is empty (rather than there not being a key).
 
     exportd = dict()
-    for traverse in traverses: exportd[traverse[0]] = []
-    
+    for traverse in traverses:
+        exportd[traverse[0]] = []
+
     for traverse_name, station_id in exports:
-            exportd[traverse_name].append(station_id)
+        exportd[traverse_name].append(station_id)
 
 # If we made it this far we're ready to write the survex file
 
-    print '; survex file autogenerated from', docname
+    print('; survex file autogenerated from', docname)
 
     if imgfile is not None:
-        print '; embedded image file name', imgfile
+        print('; embedded image file name', imgfile)
 
-    print '; generated', strftime('%c'), '\n'
+    print('; generated', strftime('%c'), '\n')
 
-    print '; SVG orientation: (%g, %g) is' % (nx, ny), sprintd(e.options.north)
-    print '; SVG orientation: (%g, %g) is' % (ex, ey), sprintd(e.options.north + 90)
-    print '; SVG scale: %g is %g m, scale factor = %g' % (scalelen, e.options.scale, scalefac)
-    print '; SVG contained %i traverses and %i stations' % (ntraverse, nstation)
-    print '; tolerance for identifying equates = %g m\n' % e.options.tol
+    print('; SVG orientation: (%g, %g) is' % (nx, ny), sprintd(e.options.north))
+    print('; SVG orientation: (%g, %g) is' % (ex, ey), sprintd(e.options.north + 90))
+    print('; SVG scale: %g is %g m, scale factor = %g' % (scalelen, e.options.scale, scalefac))
+    print('; SVG contained %i traverses and %i stations' % (ntraverse, nstation))
+    print('; tolerance for identifying equates = %g m\n' % e.options.tol)
 
-    print '\n*begin', toplevel
+    print('\n*begin', toplevel)
 
     if equates:
-        print
+        print()
         for equate in equates:
-            print '*equate %s.%i' % equate[0], '%s.%i' % equate[1], '; separation %0.2f m' % equate[2]
+            print('*equate %s.%i' % equate[0], '%s.%i' % equate[1],
+                  '; separation %0.2f m' % equate[2])
 
-    print '\n*data normal from to tape compass clino'
+    print('\n*data normal from to tape compass clino')
 
     for traverse in traverses:
-        print '\n*begin', traverse[0]
+        print('\n*begin', traverse[0])
         if exportd[traverse[0]]:
-            print '*export', ' '.join(map(str, sorted(exportd[traverse[0]])))
+            print('*export', ' '.join(map(str, sorted(exportd[traverse[0]]))))
         for leg in traverse[1]:
-            print '%3i %3i %7.2f ' % leg[0:3], sprintd(leg[3]), ' 0'
-        print '*end', traverse[0]
+            print('%3i %3i %7.2f ' % leg[0:3], sprintd(leg[3]), ' 0')
+        print('*end', traverse[0])
 
-    print '\n*end', toplevel, '\n'
-    print '; end of file'
+    print('\n*end', toplevel, '\n')
+    print('; end of file')
 
-except: PathError
+except Exception:
+    PathError
 
 if msg is not None:
     sys.stderr.write('Encountered a PathError:\n')
