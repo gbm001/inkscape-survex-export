@@ -108,20 +108,46 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         pars.add_argument('--north', type=float, dest='north', default='0.0',
                           help='Bearing for orientation line (in degrees)')
 
+        pars.add_argument('--extended', type=str, dest='extended', default='1',
+                          help='Extended elevation?')
+
+        pars.add_argument(
+            '--proj-scale', type=float, dest='proj_scale', default='100.0',
+            help='Length of projection scale bar (in m)')
+
+        pars.add_argument(
+            '--proj-angle', type=float, dest='proj_angle', default='0.0',
+            help='Bearing of projected elevation')
+
         pars.add_argument('--tol', type=float, dest='tol', default='0.2',
                           help='Tolerance to equate stations (in m)')
 
         pars.add_argument('--layer', type=str, dest='layer', default='',
                           help='Restrict conversion to a named layer')
 
-        pars.add_argument('--cpaths', type=str, dest='cpaths', default='#ff0000',
-                          help='Color of (poly)lines for export (default #ff0000)')
+        pars.add_argument(
+            '--cpaths', type=str, dest='cpaths', default='#ff0000',
+            help='Color of (poly)lines for export (default #ff0000)')
 
-        pars.add_argument('--cnorth', type=str, dest='cnorth', default='#00ff00',
-                          help='Color of orientation line (default #00ff00)')
+        pars.add_argument(
+            '--cproj-paths', type=str, dest='cproj_paths', default='#800000',
+            help='Color of projection(poly)lines for export (default #800000)')
 
-        pars.add_argument('--cscale', type=str, dest='cscale', default='#0000ff',
-                          help='Color of scale bar line (default #0000ff)')
+        pars.add_argument(
+            '--cnorth', type=str, dest='cnorth', default='#00ff00',
+            help='Color of orientation line (default #00ff00)')
+
+        pars.add_argument(
+            '--cproj-up', type=str, dest='cproj_up', default='#008000',
+            help='Color of projection up line (default #008000)')
+
+        pars.add_argument(
+            '--cscale', type=str, dest='cscale', default='#0000ff',
+            help='Color of scale bar line (default #0000ff)')
+
+        pars.add_argument(
+            '--cproj-scale', type=str, dest='cproj_scale', default='#000080',
+            help='Color of projection scale bar line (default #000080)')
 
     def save(self, stream):
         """Write survex file to stream"""

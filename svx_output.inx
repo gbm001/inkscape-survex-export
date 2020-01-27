@@ -9,20 +9,29 @@
       <param name="scale" type="float" precision="2" min="0" max="9999" _gui-text="Length of scale line (in m)">100.00</param>
       <param name="north" type="float" precision="1" min="0" max="360" _gui-text="Bearing of orientation line (in degrees)">0.0</param>
       <param name="tol" type="float" precision="2" min="0" max="9999" _gui-text="Tolerance to equate stations (in m)">0.2</param>
+      <param name="extended" type="boolean" _gui-text="Extended elevation?">1</param>
+      <param name="proj-scale" type="float" precision="2" min="0" max="9999" _gui-text="Length of projection scale line (in m)">100.00</param>
+      <param name="proj-angle" type="float" precision="2" min="0" max="360" _gui-text="Bearing of projected elevation">0.0</param>
       <param name="layer" type="string" _gui-text="Restrict conversion to a named layer"></param>
     </page>
     <page name="Colors" _gui-text="Colors">
       <param name="cpaths" type="string" _gui-text="Color of (poly)lines for export (default red)">#ff0000</param>
+      <param name="cproj-paths" type="string" _gui-text="Color of projection lines (default dark red)">#800000</param>
       <param name="cnorth" type="string" _gui-text="Color of orientation line (default green)">#00ff00</param>
+      <param name="cproj-up" type="string" _gui-text="Color of up line (default dark green)">#008000</param>
       <param name="cscale" type="string" _gui-text="Color of scale line (default blue)">#0000ff</param>
+      <param name="cproj-scale" type="string" _gui-text="Color of projection scale line (default dark blue)">#000080</param>
       <param name="info" type="description">(color code is #rrggbb)</param>
     </page>
     <page name="Help" _gui-text="Help">
       <param name="about1" type="description">The following conventions are observed:</param>
       <param name="about2" type="description"> * red (poly)lines are converted to traverses;</param>
+      <param name="about2" type="description"> * dark red (poly)lines are used to calculate elevation from the projection;</param>
       <param name="about3" type="description"> * a green line represents the orientation (default S to N);</param>
-      <param name="about4" type="description"> * a blue line represents the scale (bar).</param>
-      <param name="about5" type="description">Default colors can be changed in the Colors tab.</param>
+      <param name="about4" type="description"> * a dark green line represents the optional projection orientation (up);</param>
+      <param name="about5" type="description"> * a blue line represents the scale (bar);</param>
+      <param name="about6" type="description"> * a blue line represents the optional projection scale (bar).</param>
+      <param name="about7" type="description">Default colors can be changed in the Colors tab.</param>
     </page>
   </param>
   <output>
