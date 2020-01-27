@@ -117,7 +117,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         pars.add_argument(
             '--proj-angle', type=float, dest='proj_angle', default='0.0',
-            help='Bearing of projected elevation')
+            help='Inclination of projected elevation orientation arrow')
 
         pars.add_argument('--tol', type=float, dest='tol', default='0.2',
                           help='Tolerance to equate stations (in m)')
@@ -164,6 +164,8 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         stream_print = get_stream_printer(stream)
 
         # Find out some basic properties
+
+        extended_projection = True if self.options.extended == 'true' else False
 
         svg = self.document.getroot()
         inkex_sodipodi = inkex.NSS['sodipodi']
@@ -214,6 +216,10 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             msg = 'No paths found at all!'
             raise PathError(msg)
 
+        # ---- Get orientation and scale bars ----
+
+        projection = True  # Assume there is a projection
+
         # Find the orientation line.
 
         subpaths = [path for path in paths if path[2] == self.options.cnorth]
@@ -224,14 +230,29 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         if len(subpaths) > 1:
             msg = f'Multiple orientation lines of color {self.options.cnorth}'
             raise PathError(msg)
-
         # Find the bearing of 'north' on the SVG
-
         steps = path_to_steps(subpaths[0])
         dx, dy, dl = measure(steps)
         # Negative dy as y coordinates of SVG are reversed
         north_bearing = math.degrees(math.atan2(dx, -dy) - self.options.north)
         north_bearing %= 360.0
+
+        # Find any projection orientation line.
+
+        subpaths = [path for path in paths if path[2] == self.options.cproj_up]
+        if not subpaths:
+            projection = False
+        elif len(subpaths) > 1:
+            msg = ('Multiple projection orientation lines of '
+                   + f'color {self.options.cproj_up}')
+            raise PathError(msg)
+        else:
+            steps = path_to_steps(subpaths[0])
+            dx, dy, dl = measure(steps)
+            # Negative dy as y coordinates of SVG are reversed
+            proj_up_bearing = math.degrees(
+                math.atan2(dx, -dy) - self.options.proj_angle)
+            proj_up_bearing %= 360.0
 
         # Find the scale bar line
 
@@ -243,34 +264,93 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         if len(subpaths) > 1:
             msg = f'Multiple scale bar lines of color {self.options.cscale}'
             raise PathError(msg)
-
         # Calculate the scale factor
-
         steps = path_to_steps(subpaths[0])
         scalelen = measure(steps)[2]
         scalefac = self.options.scale / scalelen
 
+        # Find any projection scale bar line
+
+        subpaths = [path for path in paths
+                    if path[2] == self.options.cproj_scale]
+
+        if not subpaths:
+            projection = False
+        elif len(subpaths) > 1:
+            msg = ('Multiple projection scale bar lines of '
+                   + f'color {self.options.cproj_scale}')
+            raise PathError(msg)
+        else:
+            # Calculate the scale factor
+            steps = path_to_steps(subpaths[0])
+            proj_scalelen = measure(steps)[2]
+            proj_scalefac = self.options.scale / proj_scalelen
+
+        # ---- Get plan and projection lines ----
+
         # Find the exportable (poly)lines
 
-        paths = [path for path in paths if path[2] == self.options.cpaths]
+        plan_paths = [path for path in paths if path[2] == self.options.cpaths]
 
-        if not paths:
+        if not plan_paths:
             msg = f'No exportable lines found of color {self.options.cpaths}'
             raise PathError(msg)
 
         if self.options.layer:
-            paths = [path for path in paths if path[3] == self.options.layer]
-            if not paths:
-                msg = (f'No exportable lines found of color {self.options.cpaths} '
-                       + f'in layer {self.options.layer}')
+            plan_paths = [path for path in plan_paths 
+                          if path[3] == self.options.layer]
+            if not plan_paths:
+                msg = ('No exportable lines found of color '
+                       + f'{self.options.cpaths} in layer {self.options.layer}')
                 raise PathError(msg)
 
+        path_name_dict = {x[0]: x for x in plan_paths}
+
         # Scale and rotate all paths by the scale factor and north bearing
-        for path in paths:
+        for path in plan_paths:
             # Important to rotate before flipping y axis
             path[1].rotate(-north_bearing, center=(0.0, 0.0), inplace=True)
             # SVG y coordinates are reversed, so scale by negative
             path[1].scale(scalefac, -scalefac, inplace=True)
+
+        # Find the projection lines
+
+        proj_paths = [path for path in paths
+                      if path[2] == self.options.cproj_paths]
+
+        if proj_paths and not projection:
+            msg = (f'Projection lines found but no scale bar/orientation line!')
+            raise PathError(msg)
+        elif not proj_paths and projection:
+            msg = (f'No exportable projection lines found of color '
+                   + f'{self.options.cproj_paths}')
+            raise PathError(msg)
+
+        if self.options.layer and projection:
+            proj_paths = [path for path in proj_paths
+                          if path[3] == self.options.layer]
+            if not proj_paths:
+                msg = ('No exportable lines found of color '
+                       + f'{self.options.cproj_paths} '
+                       + f'in layer {self.options.layer}')
+                raise PathError(msg)
+
+        # Check projection paths match plan paths
+        for proj_path in proj_paths:
+            path_name = proj_path[0]
+            if not path_name.endswith('E'):
+                msg = f'Projection path {path_name} name does not end in E'
+                raise PathError
+            if path_name[:-1] not in path_name_dict:
+                msg = f'Projection path {path_name} name does not match a plan path'
+                raise PathError
+
+        # Scale and rotate all paths by the scale factor and up direction
+        for path in proj_paths:
+            # Important to rotate before flipping y axis
+            path[1].rotate(-proj_up_bearing, center=(0.0, 0.0), inplace=True)
+            # SVG y coordinates are reversed, so scale by negative
+            path[1].scale(proj_scalefac, -proj_scalefac, inplace=True)
 
         # Now build the survex traverses.  Keep track of stations and
         # absolute positions to identify equates and exports.
@@ -282,7 +362,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         stations = []
         traverses = []
 
-        for path in paths:
+        for path in plan_paths:
             legs = []
             steps = path_to_steps(path)
             for i, step in enumerate(steps):
@@ -369,6 +449,14 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                      + f'(North arrow at {self.options.north} degrees)')
         stream_print(f'; SVG scale: {scalelen} is {self.options.scale} m, '
                      + f'scale factor = {scalefac}')
+        if projection:
+            stream_print(
+                f'; SVG projection orientation: North is {proj_up_bearing} '
+                + f'degrees (up arrow at {self.options.proj_angle} degrees)')
+            stream_print(
+                f'; SVG projection scale: {proj_scalelen} is '
+                + f'{self.options.proj_scale} m, scale factor = '
+                + f'{proj_scalefac}')
         stream_print(
             f'; SVG contained {ntraverse} traverses and {nstation} stations')
         stream_print(
