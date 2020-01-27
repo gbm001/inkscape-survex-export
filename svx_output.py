@@ -27,11 +27,11 @@ import sys
 import math
 from time import strftime
 from itertools import combinations
-import inkex, simplepath, simplestyle
+from inkex.paths import Path
+import inkex
+
 
 # Define a (trivial) exception class to catch path errors
-
-
 class PathError(Exception):
     pass
 
@@ -63,37 +63,37 @@ msg = None
 
 e = inkex.Effect()
 
-e.OptionParser.add_option('--tab', action='store',
-                          type='string', dest='tab', default='',
-                          help='Dummy argument')
+e.arg_parser.add_option('--tab', action='store',
+                        type='string', dest='tab', default='',
+                        help='Dummy argument')
 
-e.OptionParser.add_option('--scale', action='store',
-                          type='float', dest='scale', default='100.0',
-                          help='Length of scale bar (in m)')
+e.arg_parser.add_option('--scale', action='store',
+                        type='float', dest='scale', default='100.0',
+                        help='Length of scale bar (in m)')
 
-e.OptionParser.add_option('--north', action='store',
-                          type='float', dest='north', default='0.0',
-                          help='Bearing for orientation line (in degrees)')
+e.arg_parser.add_option('--north', action='store',
+                        type='float', dest='north', default='0.0',
+                        help='Bearing for orientation line (in degrees)')
 
-e.OptionParser.add_option('--tol', action='store',
-                          type='float', dest='tol', default='0.2',
-                          help='Tolerance to equate stations (in m)')
+e.arg_parser.add_option('--tol', action='store',
+                        type='float', dest='tol', default='0.2',
+                        help='Tolerance to equate stations (in m)')
 
-e.OptionParser.add_option('--layer', action='store',
-                          type='string', dest='layer', default='',
-                          help='Restrict conversion to a named layer')
+e.arg_parser.add_option('--layer', action='store',
+                        type='string', dest='layer', default='',
+                        help='Restrict conversion to a named layer')
 
-e.OptionParser.add_option('--cpaths', action='store',
-                          type='string', dest='cpaths', default='#ff0000',
-                          help='Color of (poly)lines for export (default #ff0000)')
+e.arg_parser.add_option('--cpaths', action='store',
+                        type='string', dest='cpaths', default='#ff0000',
+                        help='Color of (poly)lines for export (default #ff0000)')
 
-e.OptionParser.add_option('--cnorth', action='store',
-                          type='string', dest='cnorth', default='#00ff00',
-                          help='Color of orientation line (default #00ff00)')
+e.arg_parser.add_option('--cnorth', action='store',
+                        type='string', dest='cnorth', default='#00ff00',
+                        help='Color of orientation line (default #00ff00)')
 
-e.OptionParser.add_option('--cscale', action='store',
-                          type='string', dest='cscale', default='#0000ff',
-                          help='Color of scale bar line (default #0000ff)')
+e.arg_parser.add_option('--cscale', action='store',
+                        type='string', dest='cscale', default='#0000ff',
+                        help='Color of scale bar line (default #0000ff)')
 
 e.getoptions()
 
@@ -109,9 +109,9 @@ e.parse(sys.argv[-1])
 # Find out some basic properties
 
 svg = e.document.getroot()
-inkex_sodipodi = inkex.NSS["sodipodi"]
-inkex_svg = inkex.NSS[u'svg']
-inkex_inkscape = inkex.NSS[u'inkscape']
+inkex_sodipodi = inkex.NSS['sodipodi']
+inkex_svg = inkex.NSS['svg']
+inkex_inkscape = inkex.NSS['inkscape']
 
 s = f'{{{inkex_sodipodi}}}docname'
 
@@ -126,9 +126,9 @@ else:
     toplevel = e.options.layer
 
 # el = svg.find('.//svg:image', namespaces=inkex.NSS)
-el = svg.find(f'.//{{{inkex.NSS["svg"]}}}image')
+el = svg.find(f'.//{{{inkex_svg]}}}image')
 
-s = f'{{{inkex.NSS["sodipodi"]}}}absref'
+s = f'{{{inkex_sodipodi}}}absref'
 
 if el is not None and s in el.attrib:
     imgfile = os.path.split(el.attrib[s])[1]
@@ -145,7 +145,7 @@ lines = svg.findall(f'.//{{{inkex_svg}}}g/{{{inkex_svg}}}path')
 paths = []
 
 for line in lines:
-    stroke = simplestyle.parseStyle(line.attrib['style'])['stroke']
+    stroke = dict(inkex.Style.parse_str((line.attrib['style'])['stroke']))
     layer = line.getparent().attrib[f'{{{inkex_inkscape}}}label']
     paths.append((line.attrib['id'], line.attrib['d'], stroke, layer))
 
@@ -170,7 +170,7 @@ try:
 # Construct the unit vector (nx, ny) to point along N, and the unit
 # (ex, ey) to point along E.  We correct for north later.
 
-    steps = simplepath.parsePath(subpaths[0][1])
+    steps = Path(subpaths[0][1]).to_arrays()
     dx, dy, dl = measure(steps)
     nx, ny = dx/dl, dy/dl
     ex, ey = -ny, nx
@@ -185,7 +185,7 @@ try:
 
 # Calculate the scale factor
 
-    steps = simplepath.parsePath(subpaths[0][1])
+    steps = Path(subpaths[0][1]).to_arrays()
     scalelen = measure(steps)[2]
     scalefac = e.options.scale / scalelen
 
@@ -216,7 +216,7 @@ try:
 
     for path in paths:
         legs = []
-        steps = simplepath.parsePath(path[1])
+        steps = Path(path[1]).to_arrays()
         for i, step in enumerate(steps):
             stations.append((step[1][0], step[1][1], path[0], i))
             if i == 0:
