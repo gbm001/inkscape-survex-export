@@ -63,37 +63,37 @@ msg = None
 
 e = inkex.Effect()
 
-e.arg_parser.add_option('--tab', action='store',
-                        type='string', dest='tab', default='',
-                        help='Dummy argument')
+e.arg_parser.add_argument('--tab', action='store',
+                          type='string', dest='tab', default='',
+                          help='Dummy argument')
 
-e.arg_parser.add_option('--scale', action='store',
-                        type='float', dest='scale', default='100.0',
-                        help='Length of scale bar (in m)')
+e.arg_parser.add_argument('--scale', action='store',
+                          type='float', dest='scale', default='100.0',
+                          help='Length of scale bar (in m)')
 
-e.arg_parser.add_option('--north', action='store',
-                        type='float', dest='north', default='0.0',
-                        help='Bearing for orientation line (in degrees)')
+e.arg_parser.add_argument('--north', action='store',
+                          type='float', dest='north', default='0.0',
+                          help='Bearing for orientation line (in degrees)')
 
-e.arg_parser.add_option('--tol', action='store',
-                        type='float', dest='tol', default='0.2',
-                        help='Tolerance to equate stations (in m)')
+e.arg_parser.add_argument('--tol', action='store',
+                          type='float', dest='tol', default='0.2',
+                          help='Tolerance to equate stations (in m)')
 
-e.arg_parser.add_option('--layer', action='store',
-                        type='string', dest='layer', default='',
-                        help='Restrict conversion to a named layer')
+e.arg_parser.add_argument('--layer', action='store',
+                          type='string', dest='layer', default='',
+                          help='Restrict conversion to a named layer')
 
-e.arg_parser.add_option('--cpaths', action='store',
-                        type='string', dest='cpaths', default='#ff0000',
-                        help='Color of (poly)lines for export (default #ff0000)')
+e.arg_parser.add_argument('--cpaths', action='store',
+                          type='string', dest='cpaths', default='#ff0000',
+                          help='Color of (poly)lines for export (default #ff0000)')
 
-e.arg_parser.add_option('--cnorth', action='store',
-                        type='string', dest='cnorth', default='#00ff00',
-                        help='Color of orientation line (default #00ff00)')
+e.arg_parser.add_argument('--cnorth', action='store',
+                          type='string', dest='cnorth', default='#00ff00',
+                          help='Color of orientation line (default #00ff00)')
 
-e.arg_parser.add_option('--cscale', action='store',
-                        type='string', dest='cscale', default='#0000ff',
-                        help='Color of scale bar line (default #0000ff)')
+e.arg_parser.add_argument('--cscale', action='store',
+                          type='string', dest='cscale', default='#0000ff',
+                          help='Color of scale bar line (default #0000ff)')
 
 e.getoptions()
 
@@ -126,7 +126,7 @@ else:
     toplevel = e.options.layer
 
 # el = svg.find('.//svg:image', namespaces=inkex.NSS)
-el = svg.find(f'.//{{{inkex_svg]}}}image')
+el = svg.find(f'.//{{{inkex_svg}}}image')
 
 s = f'{{{inkex_sodipodi}}}absref'
 
