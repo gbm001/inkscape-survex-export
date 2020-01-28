@@ -3,7 +3,8 @@
 svx_output.py
 Python script for exporting survex (.svx) file from Inkscape
 
-Copyright (C) 2015 Patrick B Warren
+Copyright (C) 2015 Patrick B Warren (original)
+          (C) 2020 Andrew McLeod (modifications)
 
 Email: patrickbwarren@gmail.com
 
@@ -30,6 +31,7 @@ from itertools import combinations
 from inkex.paths import Path
 from inkex.utils import AbortExtension
 import inkex
+import numpy as np
 
 
 # Define a (trivial) exception class to catch path errors
@@ -165,7 +167,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         # Find out some basic properties
 
-        extended_elevation = True if self.options.extended == 'true' else False
+        extended_elevation = True if self.options.extended == '1' else False
 
         svg = self.document.getroot()
         inkex_sodipodi = inkex.NSS['sodipodi']
@@ -352,6 +354,35 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             # SVG y coordinates are reversed, so scale by negative
             path[1].scale(proj_scalefac, -proj_scalefac, inplace=True)
 
+        # Build the projection 'graphs' that go from position to height
+
+        if projection:
+
+            proj_heights = {}
+
+            for proj_path in proj_paths:
+                # Loop over each projection path and treat separately
+                # Projection data is (position, height) data from SVG
+                path_name = proj_path[0]
+                legs = []
+                points = path_to_points(path)
+                proj_height = np.zeros((len(points), 2))
+                d0, z0 = points[0][:]
+                for i, point in enumerate(points):
+                    proj_height[i, :] = point[:]
+                proj_height[:, 0] -= d0
+                proj_height[:, 1] -= z0
+
+                if extended_elevation:
+                    # Unfold elevation (all position change is positive)
+                    proj_dx = np.abs(proj_height[1:, 0] - proj_height[:-1, 0])
+                    proj_height[1:, 0] = np.cumsum(proj_dx)
+                else:
+                    # Sort the proj_height array
+                    proj_height.sort(axis=0)
+
+                proj_heights[path_name[:-1]] = proj_height
+
         # Now build the survex traverses.  Keep track of stations and
         # absolute positions to identify equates and exports.
 
@@ -364,17 +395,51 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         for path in plan_paths:
             legs = []
-            points = path_to_points(path)
-            for i, point in enumerate(points):
-                stations.append((point[0], point[1], path[0], i))
-                if i == 0:
-                    continue
-                dx, dy, dl = distance(point[i-1], point)
-                tape = dl  # scalefac * dl
-                compass = math.degrees(math.atan2(dx, dy))
-                #compass = self.options.north + math.degrees(
-                    #math.atan2(ex*dx+ey*dy, nx*dx+ny*dy))
-                legs.append((i-1, i, tape, compass))
+            points = np.asarray(path_to_points(path))
+            dx = points[1:, 0] - points[:-1, 0]
+            dy = points[1:, 1] - points[:-1, 1]
+            ds = np.sqrt(dx**2 + dy**2)  # Plan length
+            angle = np.rad2deg(np.arctan2(dx, dy)) % 360.0
+            inclination = np.zeros_like(angle)
+
+            # If projection and matching path, calculate heights
+            if projection and path[0] in proj_heights:
+                proj_height = proj_heights[path[0]]
+                s = np.zeros((points.shape[0]))
+                if extended_elevation:
+                    # Distance travelled
+                    s[1:] = np.cumsum(ds)
+                    # Stretch extended elevation over full range of path
+                    length_correction = s[-1] / proj_height[-1, 0]
+                    if not (0.95 <= length_correction <= 1.05):
+                        raise AbortExtension(
+                            'Extended elevation distance correction of '
+                            + f'{length_correction} required!')
+                    proj_height[:, 0] *= length_correction
+                else:
+                    # Project positions onto proj_bearing line
+                    # l = | y sin(theta) - x cos (theta) |
+                    theta = np.deg2rad(self.options.proj_bearing)
+                    s = np.abs(
+                        points[:, 1] * np.sin(theta)
+                        - points[:, 0] * np.cos(theta)
+                        )
+                    # Normalize to starting point
+                    s = s - s[0]
+
+                depths = np.interp(s, proj_height[:, 0], proj_height[:, 1])
+                d_depth = depths[1:] - depths[:-1]
+
+                inclination = np.rad2deg(np.arctan(d_depth / ds))
+                dl = np.sqrt(ds**2 + d_depth**2)  # 3D leg length
+            else:
+                dl = ds
+
+            for i in range(dx.size):
+                tape = dl[i]
+                compass = angle[i]
+                clino = inclination[i]
+                legs.append((i, i+1, tape, compass, clino))
             traverses.append((path[0], legs))
 
         ntraverse = len(traverses)
@@ -484,7 +549,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                 sorted_export_str = [str(x) for x in sorted(exportd[traverse[0]])]
                 stream_print(f'*export {" ".join(sorted_export_str)}')
             for leg in traverse[1]:
-                stream_print(f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} {sprintd(leg[3])}  0')
+                stream_print(f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} {sprintd(leg[3])} {leg[4]:2.2f}')
             stream_print('*end', traverse[0])
 
         stream_print(f'\n*end {toplevel} \n')
