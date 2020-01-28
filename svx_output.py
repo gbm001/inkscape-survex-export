@@ -55,19 +55,19 @@ def distance(p1, p2):
     return dx, dy, dl
 
 
-def measure(steps):
-    "Measure the distance between first two steps"
-    return distance(steps[0], steps[1])
+def measure(points):
+    "Measure the distance between first two points"
+    return distance(points[0], points[1])
 
 
-def path_to_steps(path):
-    """Convert a path to a series of steps.
+def path_to_points(path):
+    """Convert a path to a series of points.
     path_in is a tuple where the second element is a Path object.
     Returns a series of points.
     """
     path_segs = path[1]
 
-    steps = []
+    points = []
     for seg in path_segs:
         if len(seg.args) > 2:
             raise PathError('Over-complicated path segments')
@@ -81,8 +81,8 @@ def path_to_steps(path):
             x, y = path_segs[0].args
         else:
             raise PathError('Unknown segment type')
-        steps.append((x, y))
-    return steps
+        points.append((x, y))
+    return points
 
 
 def get_stream_printer(stream):
@@ -116,8 +116,8 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             help='Length of projection scale bar (in m)')
 
         pars.add_argument(
-            '--proj-angle', type=float, dest='proj_angle', default='0.0',
-            help='Inclination of projected elevation orientation arrow')
+            '--proj-angle', type=float, dest='proj_bearing', default='0.0',
+            help='Bearing of projected elevation')
 
         pars.add_argument('--tol', type=float, dest='tol', default='0.2',
                           help='Tolerance to equate stations (in m)')
@@ -165,7 +165,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         # Find out some basic properties
 
-        extended_projection = True if self.options.extended == 'true' else False
+        extended_elevation = True if self.options.extended == 'true' else False
 
         svg = self.document.getroot()
         inkex_sodipodi = inkex.NSS['sodipodi']
@@ -231,8 +231,8 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             msg = f'Multiple orientation lines of color {self.options.cnorth}'
             raise PathError(msg)
         # Find the bearing of 'north' on the SVG
-        steps = path_to_steps(subpaths[0])
-        dx, dy, dl = measure(steps)
+        points = path_to_points(subpaths[0])
+        dx, dy, dl = measure(points)
         # Negative dy as y coordinates of SVG are reversed
         north_bearing = math.degrees(math.atan2(dx, -dy) - self.options.north)
         north_bearing %= 360.0
@@ -247,12 +247,10 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                    + f'color {self.options.cproj_up}')
             raise PathError(msg)
         else:
-            steps = path_to_steps(subpaths[0])
-            dx, dy, dl = measure(steps)
+            points = path_to_points(subpaths[0])
+            dx, dy, dl = measure(points)
             # Negative dy as y coordinates of SVG are reversed
-            proj_up_bearing = math.degrees(
-                math.atan2(dx, -dy) - self.options.proj_angle)
-            proj_up_bearing %= 360.0
+            proj_up_angle = math.degrees(math.atan2(dx, -dy)) % 360.0
 
         # Find the scale bar line
 
@@ -265,8 +263,8 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             msg = f'Multiple scale bar lines of color {self.options.cscale}'
             raise PathError(msg)
         # Calculate the scale factor
-        steps = path_to_steps(subpaths[0])
-        scalelen = measure(steps)[2]
+        points = path_to_points(subpaths[0])
+        scalelen = measure(points)[2]
         scalefac = self.options.scale / scalelen
 
         # Find any projection scale bar line
@@ -282,8 +280,8 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             raise PathError(msg)
         else:
             # Calculate the scale factor
-            steps = path_to_steps(subpaths[0])
-            proj_scalelen = measure(steps)[2]
+            points = path_to_points(subpaths[0])
+            proj_scalelen = measure(points)[2]
             proj_scalefac = self.options.scale / proj_scalelen
 
         # ---- Get plan and projection lines ----
@@ -297,7 +295,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             raise PathError(msg)
 
         if self.options.layer:
-            plan_paths = [path for path in plan_paths 
+            plan_paths = [path for path in plan_paths
                           if path[3] == self.options.layer]
             if not plan_paths:
                 msg = ('No exportable lines found of color '
@@ -306,7 +304,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         path_name_dict = {x[0]: x for x in plan_paths}
 
-        # Scale and rotate all paths by the scale factor and north bearing
+        # Scale and rotate all plan paths by the scale factor and north bearing
         for path in plan_paths:
             # Important to rotate before flipping y axis
             path[1].rotate(-north_bearing, center=(0.0, 0.0), inplace=True)
@@ -342,13 +340,15 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                 msg = f'Projection path {path_name} name does not end in E'
                 raise PathError
             if path_name[:-1] not in path_name_dict:
-                msg = f'Projection path {path_name} name does not match a plan path'
+                msg = (f'Projection path {path_name} name does not match '
+                       + 'a plan path')
                 raise PathError
 
-        # Scale and rotate all paths by the scale factor and up direction
+        # Scale and rotate all projection paths by the scale factor
+        # and up direction
         for path in proj_paths:
             # Important to rotate before flipping y axis
-            path[1].rotate(-proj_up_bearing, center=(0.0, 0.0), inplace=True)
+            path[1].rotate(-proj_up_angle, center=(0.0, 0.0), inplace=True)
             # SVG y coordinates are reversed, so scale by negative
             path[1].scale(proj_scalefac, -proj_scalefac, inplace=True)
 
@@ -364,12 +364,12 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         for path in plan_paths:
             legs = []
-            steps = path_to_steps(path)
-            for i, step in enumerate(steps):
-                stations.append((step[0], step[1], path[0], i))
+            points = path_to_points(path)
+            for i, point in enumerate(points):
+                stations.append((point[0], point[1], path[0], i))
                 if i == 0:
                     continue
-                dx, dy, dl = distance(steps[i-1], step)
+                dx, dy, dl = distance(point[i-1], point)
                 tape = dl  # scalefac * dl
                 compass = math.degrees(math.atan2(dx, dy))
                 #compass = self.options.north + math.degrees(
@@ -450,9 +450,14 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         stream_print(f'; SVG scale: {scalelen} is {self.options.scale} m, '
                      + f'scale factor = {scalefac}')
         if projection:
+            if extended_elevation:
+                stream_print('; SVG using extended elevation')
+            else:
+                stream_print(
+                    '; SVG using projected elevation along bearing '
+                    + f'{proj_bearing} degrees')
             stream_print(
-                f'; SVG projection orientation: North is {proj_up_bearing} '
-                + f'degrees (up arrow at {self.options.proj_angle} degrees)')
+                f'; SVG up arrow at {proj_up_angle} degrees')
             stream_print(
                 f'; SVG projection scale: {proj_scalelen} is '
                 + f'{self.options.proj_scale} m, scale factor = '
