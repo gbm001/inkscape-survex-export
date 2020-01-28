@@ -403,6 +403,10 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             self.debug(f'Calculating for path {path[0]}')
             legs = []
             points = np.asarray(path_to_points(path))
+
+            for i in range(points.shape[0]):
+                stations.append((points[i, 0], points[i, 1], path[0], i))
+
             dx = points[1:, 0] - points[:-1, 0]
             dy = points[1:, 1] - points[:-1, 1]
             ds = np.sqrt(dx**2 + dy**2)  # Plan length
@@ -549,7 +553,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         if equates:
             stream_print()
             for equate in equates:
-                stream_print(f'*equate {equate[0][0]}.{equate[0][1]}'
+                stream_print(f'*equate {equate[0][0]}.{equate[0][1]} '
                              + f'{equate[1][0]}.{equate[1][1]}'
                              + f'; separation {equate[2]:0.2f} m')
 
