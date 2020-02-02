@@ -9,7 +9,7 @@
       <param name="scale" type="float" precision="2" min="0" max="9999" _gui-text="Length of scale line (in m)">100.00</param>
       <param name="north" type="float" precision="1" min="0" max="360" _gui-text="Bearing of orientation line (in degrees)">0.0</param>
       <param name="tol" type="float" precision="2" min="0" max="9999" _gui-text="Tolerance to equate stations (in m)">0.2</param>
-      <param name="extended" type="boolean" _gui-text="Extended elevation?">1</param>
+      <param name="extended" type="boolean" _gui-text="Extended elevation?">true</param>
       <param name="proj-horiz-scale" type="float" precision="2" min="0" max="9999" _gui-text="Length of projection horizontal scale line (in m)">100.00</param>
       <param name="proj-vert-scale" type="float" precision="2" min="0" max="9999" _gui-text="Height of projection up arrow/scale bar (in m)">100.0</param>
       <param name="proj-bearing" type="float" precision="2" min="0" max="360" _gui-text="Bearing of projected elevation">0.0</param>
@@ -42,6 +42,6 @@
     <_filetypetooltip>Export paths to survex file</_filetypetooltip>
   </output>
   <script>
-    <command reldir="extensions" interpreter="python3">svx_output.py</command>
+    <command reldir="extensions" interpreter="shell">svx_output.sh</command>
   </script>
 </inkscape-extension>

@@ -29,13 +29,12 @@ import math
 from time import strftime
 from itertools import combinations
 from inkex.paths import Path
-from inkex.utils import AbortExtension
 import inkex
 import numpy as np
 
 
 # Define a (trivial) exception class to catch path errors
-class PathError(AbortExtension):
+class PathError(inkex.utils.AbortExtension):
     pass
 
 
@@ -110,8 +109,8 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         pars.add_argument('--north', type=float, dest='north', default='0.0',
                           help='Bearing for orientation line (in degrees)')
 
-        pars.add_argument('--extended', type=str, dest='extended', default='1',
-                          help='Extended elevation?')
+        pars.add_argument('--extended', type=str, dest='extended',
+                          default='true', help='Extended elevation?')
 
         pars.add_argument(
             '--proj-horiz-scale', type=float, dest='proj_horiz_scale',
@@ -173,7 +172,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         # Find out some basic properties
 
-        extended_elevation = True if self.options.extended == '1' else False
+        extended_elevation = inkex.utils.Boolean(self.options.extended)
 
         svg = self.document.getroot()
         inkex_sodipodi = inkex.NSS['sodipodi']
