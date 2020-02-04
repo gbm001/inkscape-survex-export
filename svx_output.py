@@ -392,14 +392,14 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
         # absolute positions to identify equates and exports.
 
         # Stations is a list of tuples of (x, y, traverse_name, station_id)
-        # Traverses is a list of tuples of (traverse_name, legs), where
-        # Legs is a list of tuples of (from_id, to_id, tape, compass)
+        # Traverses is a list of tuples of (traverse_name, legs)
+        # Legs is a list of tuples of (from_id, to_id, tape, compass, clino)
+        # Clino will be None if there is no projection
 
         stations = []
         traverses = []
 
         for path in plan_paths:
-            self.debug(f'Calculating for path {path[0]}')
             legs = []
             points = np.asarray(path_to_points(path))
 
@@ -410,10 +410,10 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             dy = points[1:, 1] - points[:-1, 1]
             ds = np.sqrt(dx**2 + dy**2)  # Plan length
             angle = np.rad2deg(np.arctan2(dx, dy)) % 360.0
-            inclination = np.zeros_like(angle)
 
             # If projection and matching path, calculate heights
             if projection and path[0] in proj_heights:
+                include_clino = True
                 proj_height = proj_heights[path[0]]
                 s = np.zeros((points.shape[0]))
                 if extended_elevation:
@@ -421,11 +421,10 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                     s[1:] = np.cumsum(ds)
                     # Stretch extended elevation over full range of path
                     length_correction = s[-1] / proj_height[-1, 0]
-                    if not (0.95 <= length_correction <= 1.05):
-                        self.debug(
-                            'Extended elevation distance correction of '
-                            + f'{length_correction} required for path '
-                            + f'{path[0]}')
+                    self.msg(
+                        'Extended elevation distance correction of '
+                        + f'{length_correction} required for path '
+                        + f'{path[0]}')
                     proj_height[:, 0] *= length_correction
                 else:
                     # Project positions onto proj_bearing line
@@ -444,12 +443,13 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                 inclination = np.rad2deg(np.arctan(d_depth / ds))
                 dl = np.sqrt(ds**2 + d_depth**2)  # 3D leg length
             else:
+                include_clino = False
                 dl = ds
 
             for i in range(dx.size):
                 tape = dl[i]
                 compass = angle[i]
-                clino = inclination[i]
+                clino = inclination[i] if include_clino else False
                 legs.append((i, i+1, tape, compass, clino))
             traverses.append((path[0], legs))
 
@@ -564,13 +564,14 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                 sorted_export_str = [str(x) for x in sorted(exportd[traverse[0]])]
                 stream_print(f'*export {" ".join(sorted_export_str)}')
             for leg in traverse[1]:
-                stream_print(f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} {sprintd(leg[3])} {leg[4]:2.2f}')
+                clino = f'{leg[4]:2.2f}' if leg[4] is not None else '-'
+                stream_print(
+                    f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} '
+                    + f'{sprintd(leg[3])} {clino}')
             stream_print('*end', traverse[0])
 
         stream_print(f'\n*end {toplevel} \n')
         stream_print('; end of file')
-
-        # End of python script
 
 
 if __name__ == '__main__':
