@@ -565,9 +565,9 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
                     # Stretch extended elevation over full range of path
                     length_correction = s[-1] / proj_height[-1, 0]
                     self.msg(
-                        'Extended elevation distance correction of '
-                        + f'{length_correction} required for path '
-                        + f'{path[0]}')
+                        'Extended elevation length correction of '
+                        + f'{(1.0-length_correction)*100:3.2f}% required for '
+                        + f'path {path[0]}')
                     proj_height[:, 0] *= length_correction
                 else:
                     # Project positions onto proj_bearing line
