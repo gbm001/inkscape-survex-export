@@ -592,7 +592,7 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
             for i in range(dx.size):
                 tape = dl[i]
                 compass = angle[i]
-                clino = inclination[i] if include_clino else False
+                clino = inclination[i] if include_clino else None
                 legs.append((i, i+1, tape, compass, clino))
             traverses.append((path[0], legs))
 
