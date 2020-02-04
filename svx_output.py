@@ -38,6 +38,154 @@ class PathError(inkex.utils.AbortExtension):
     pass
 
 
+class SurveyOutput:
+    """Class to output survey data. Must be subclassed to provide a particular
+    output format i.e. Survex or Therion.
+    """
+    NEWLINE = '\n'
+
+    def __init__(self, stream, survey_name='mainsurvey'):
+        """Initialize this SurveyOutput instance."""
+        self.stream = stream
+        self.survey_name = survey_name
+        self.header_comments = []
+        self.equates = []
+        self.survey_data = {}
+
+    def add_header_comment(self, comment):
+        """Add a comment at the top of the file"""
+        self.header_comments.append(comment)
+
+    def add_header_comments(self, comments):
+        """Add a number of comments at the top of the file"""
+        self.header_comments.extend(comments)
+
+    def add_equates(self, equates):
+        """Add a set of equates to output"""
+        self.equates.extend(equates)
+
+    def add_survey(self, name, exports, legs):
+        """Add a set of survey data to this SurveyOutput instance."""
+        if name in self.survey_data:
+            return ValueError('Already added this survey data')
+        self.survey_data[name] = (exports, legs)
+
+    def _header(self):
+        """File header"""
+        self._write_line(f'{self.START_SURVEY}{self.survey_name}')
+        self._write_line()
+
+    def _footer(self):
+        """File footer"""
+        self._write_line()
+        self._write_line(f'{self.END_SURVEY}{self.survey_name}')
+
+    def _write_equates(self, equates):
+        """Writes equate commands.
+        Equates are a list of tuples of format:
+        ((survey_name1, station1), (survey_name2, station2), separation).
+        """
+        for equate in equates:
+            format_dict = {
+                'survey1': equate[0][0],
+                'station1': equate[0][1],
+                'survey2': equate[1][0],
+                'station2': equate[1][1],
+                'separation': equate[2]}
+            self._write_line(self.EQUATE_FORMAT.format(**format_dict))
+
+    def _write_exports(self, exports):
+        """Write a list of stations to export."""
+        raise NotImplementedError('SurveyOutput must be subclassed')
+
+    def _write_survey(self, survey_name, exports, legs):
+        """Write a set of survey data.
+        Legs is a list of tuples of (from, to, tape, compass, clino)
+        Clino may be None if there was no projection data.
+        """
+
+        self._write_line(f'{self.START_SURVEY}{survey_name}')
+        self._write_line(self.SURVEY_HEADER)
+        self._write_exports(exports)
+
+        for leg in legs:
+            clino = f'{leg[4]:2.2f}' if leg[4] is not None else '-'
+            self._write_line(
+                f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} '
+                + f'{leg[3]:2.2f} {clino}')
+
+        self._write_line(self.SURVEY_FOOTER)
+        self._write_line(f'{self.END_SURVEY}{survey_name}')
+
+    def _comment_line(self, comment_line):
+        """Write a comment line"""
+        self._write_line(f'{self.COMMENT} {comment_line}')
+
+    def _write_line(self, line=''):
+        """Write a single line to the stream output."""
+        if line is None:
+            # No newline if passed None
+            return
+        write_string = f'{line}{self.NEWLINE}'
+        self.stream.write(write_string.encode('ascii'))
+
+    def output(self):
+        """Write the survey output"""
+
+        if self.TOPLINE:
+            self._write_line(self.TOPLINE)
+            self._write_line()
+
+        for line in self.header_comments:
+            self._comment_line(line)
+
+        self._header()
+
+        if self.equates:
+            self._write_equates(self.equates)
+            self._write_line()
+
+        for survey_name, (exports, legs) in self.survey_data.items():
+            self._write_survey(survey_name, exports, legs)
+            self._write_line()
+
+        self._footer()
+
+
+class SurvexOutput(SurveyOutput):
+    """Output a Survex file."""
+    COMMENT = ';'
+    TOPLINE = None
+    START_SURVEY = '*begin '
+    END_SURVEY = '*end '
+    SURVEY_HEADER = '*data normal from to tape compass clino'
+    SURVEY_FOOTER = None
+    EQUATE_FORMAT = ('*equate {survey1}.{station1} {survey2}.{station2}'
+                     + '; separation {separation:0.2f} m')
+
+    def _write_exports(self, exports):
+        """Write a list of station names to export."""
+        sorted_export_str = [str(x) for x in sorted(exports)]
+        self._write_line(f'*export {" ".join(sorted_export_str)}')
+
+
+class TherionOutput(SurveyOutput):
+    """Output a Therion file."""
+    COMMENT = '#'
+    TOPLINE = 'encoding utf-8'
+    START_SURVEY = 'survey '
+    END_SURVEY = 'endsurvey '
+    SURVEY_HEADER = (
+        f'centerline\ndata normal from to tape compass clino')
+    SURVEY_FOOTER = 'endcenterline'
+    EQUATE_FORMAT = ('equate {station1}@{survey1} {station2}@{survey2}'
+                     + '# separation {separation:0.2f} m')
+
+    def _write_exports(self, exports):
+        """Therion does not accept exports, so return."""
+        pass
+
+
 def sprintd(b):
     "Takes a bearing and returns it as string in 000 format"
     while b < 0:
@@ -514,64 +662,49 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         # If we made it this far we're ready to write the survex file
 
-        stream_print(f'; survex file autogenerated from {docname}')
+        survey_outputter = SurvexOutput(stream, toplevel)
 
-        if imgfile is not None:
-            stream_print(f'; embedded image file name {imgfile}')
-
-        stream_print(f'; generated {strftime("%c")}\n')
-
-        stream_print(f'; SVG orientation: North is {north_bearing} degrees '
-                     + f'(North arrow at {self.options.north} degrees)')
-        stream_print(f'; SVG scale: {scalelen} is {self.options.scale} m, '
-                     + f'scale factor = {scalefac}')
-        if projection:
-            if extended_elevation:
-                stream_print('; SVG using extended elevation')
-            else:
-                stream_print(
-                    '; SVG using projected elevation along bearing '
-                    + f'{proj_bearing} degrees')
-            stream_print(
-                f'; SVG up arrow at {proj_up_angle} degrees')
-            stream_print(
-                f'; SVG horizontal projection scale: {proj_horiz_scalelen} is '
-                + f'{self.options.proj_horiz_scale} m, scale factor = '
-                + f'{proj_horiz_scalefac}')
-            stream_print(
-                f'; SVG vertical projection scale: {proj_vert_scalelen} is '
-                + f'{self.options.proj_vert_scale} m, scale factor = '
-                + f'{proj_vert_scalefac}')
-        stream_print(
-            f'; SVG contained {ntraverse} traverses and {nstation} stations')
-        stream_print(
-            f'; tolerance for identifying equates = {self.options.tol} m\n')
-
-        stream_print(f'\n*begin {toplevel}')
-
-        if equates:
-            stream_print()
-            for equate in equates:
-                stream_print(f'*equate {equate[0][0]}.{equate[0][1]} '
-                             + f'{equate[1][0]}.{equate[1][1]}'
-                             + f'; separation {equate[2]:0.2f} m')
-
-        stream_print('\n*data normal from to tape compass clino')
+        survey_outputter.add_equates(equates)
 
         for traverse in traverses:
-            stream_print(f'\n*begin {traverse[0]}')
-            if exportd[traverse[0]]:
-                sorted_export_str = [str(x) for x in sorted(exportd[traverse[0]])]
-                stream_print(f'*export {" ".join(sorted_export_str)}')
-            for leg in traverse[1]:
-                clino = f'{leg[4]:2.2f}' if leg[4] is not None else '-'
-                stream_print(
-                    f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} '
-                    + f'{sprintd(leg[3])} {clino}')
-            stream_print('*end', traverse[0])
+            survey_outputter.add_survey(
+                traverse[0], exportd[traverse[0]], traverse[1])
 
-        stream_print(f'\n*end {toplevel} \n')
-        stream_print('; end of file')
+        comments = [f'survex file autogenerated from {docname}']
+
+        if imgfile is not None:
+            comments.append(
+                f'embedded image file name {imgfile}')
+
+        comments.extend([
+            f'generated {strftime("%c")}\n',
+            f'SVG orientation: North is {north_bearing} degrees '
+            + f'(North arrow at {self.options.north} degrees)',
+            f'SVG scale: {scalelen} is {self.options.scale} m, '
+            + f'scale factor = {scalefac}'])
+        if projection:
+            if extended_elevation:
+                comments.append('SVG using extended elevation')
+            else:
+                comments.append(
+                    'SVG using projected elevation along bearing '
+                    + f'{proj_bearing} degrees')
+            comments.extend([
+                f'SVG up arrow at {proj_up_angle} degrees',
+                f'SVG horizontal projection scale: {proj_horiz_scalelen} is '
+                + f'{self.options.proj_horiz_scale} m, scale factor = '
+                + f'{proj_horiz_scalefac}',
+                f'SVG vertical projection scale: {proj_vert_scalelen} is '
+                + f'{self.options.proj_vert_scale} m, scale factor = '
+                + f'{proj_vert_scalefac}'])
+
+        comments.extend([
+            f'SVG contained {ntraverse} traverses and {nstation} stations',
+            f'tolerance for identifying equates = {self.options.tol} m\n'])
+
+        survey_outputter.add_header_comments(comments)
+
+        survey_outputter.output()
 
 
 if __name__ == '__main__':
