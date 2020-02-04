@@ -107,16 +107,12 @@ class SurveyOutput:
         """
 
         self._write_line(f'{self.START_SURVEY}{survey_name}')
-        self._write_line(self.SURVEY_HEADER)
+        self._write_line(self._get_survey_header(survey_name))
         self._write_exports(exports)
 
-        for leg in legs:
-            clino = f'{leg[4]:2.2f}' if leg[4] is not None else '-'
-            self._write_line(
-                f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} '
-                + f'{leg[3]:2.2f} {clino}')
+        self._write_legs(legs)
 
-        self._write_line(self.SURVEY_FOOTER)
+        self._write_line(self._get_survey_footer(survey_name))
         self._write_line(f'{self.END_SURVEY}{survey_name}')
 
     def _comment_line(self, comment_line):
@@ -160,15 +156,29 @@ class SurvexOutput(SurveyOutput):
     TOPLINE = None
     START_SURVEY = '*begin '
     END_SURVEY = '*end '
-    SURVEY_HEADER = '*data normal from to tape compass clino'
-    SURVEY_FOOTER = None
     EQUATE_FORMAT = ('*equate {survey1}.{station1} {survey2}.{station2}  '
                      + '; separation {separation:0.2f} m')
+
+    def _get_survey_header(self, survey_name):
+        """Return Survex survey header line"""
+        return '*data normal from to tape compass clino'
+
+    def _get_survey_footer(self, survey_name):
+        """Return Survex survey footer line"""
+        return None
 
     def _write_exports(self, exports):
         """Write a list of station names to export."""
         sorted_export_str = [str(x) for x in sorted(exports)]
         self._write_line(f'*export {" ".join(sorted_export_str)}')
+
+    def _write_legs(self, legs):
+        """Write all legs of the survey data."""
+        for leg in legs:
+            clino = f'{leg[4]:2.2f}' if leg[4] is not None else '-'
+            self._write_line(
+                f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} '
+                + f'{leg[3]:2.2f} {clino}')
 
 
 class TherionOutput(SurveyOutput):
@@ -183,9 +193,51 @@ class TherionOutput(SurveyOutput):
     EQUATE_FORMAT = ('equate {station1}@{survey1} {station2}@{survey2}  '
                      + '# separation {separation:0.2f} m')
 
+    def _get_survey_header(self, survey_name):
+        """Return Therion survey header line.
+        If there is no clino data, skips that column."""
+        header_lines = []
+        header_lines.append('centerline')
+        header_lines.append('data normal from to tape compass clino')
+        legs = self.survey_data[survey_name][1]
+        no_clino = all(x[4] is None for x in legs)
+        if no_clino:
+            header_lines.append('# no clino readings, so set high SD')
+            header_lines.append('sd clino 1000 degrees')
+        return '\n'.join(header_lines)
+
+    def _get_survey_footer(self, survey_name):
+        """Return Survex survey footer line"""
+        return 'endcenterline'
+
     def _write_exports(self, exports):
         """Therion does not accept exports, so return."""
         pass
+
+    def _write_legs(self, legs):
+        """Write all legs of the survey data."""
+        no_clino = all(x[4] is None for x in legs)
+        if no_clino:
+            before_bad_clino = None
+            after_bad_clino = None
+        else:
+            before_bad_clino = 'group\nsd clino 1000 degrees'
+            after_bad_clino = 'endgroup'
+        # Therion does not allow skipped clino measurements, so we have to
+        # write 0.0 but we can either set a high sd clino for the whole survey
+        # (if no_clino is True) or just each measurement (via group/endgroup)
+        for leg in legs:
+            if no_clino or leg[4] is None:
+                clino = '0.0  # DUMMY CLINO VALUE'
+            else:
+                clino = f'{leg[4]:2.2f}'
+            if leg[4] is None:
+                self._write_line(before_bad_clino)
+            self._write_line(
+                f'{leg[0]:3} {leg[1]:3} {leg[2]:7.2f} '
+                + f'{leg[3]:2.2f} {clino}')
+            if leg[4] is None:
+                self._write_line(after_bad_clino)
 
 
 def distance(p1, p2):
