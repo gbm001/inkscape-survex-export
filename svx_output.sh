@@ -1,2 +1,2 @@
 #!/usr/bin/sh
-/usr/bin/env python3 svx_output.py "$@"
+/usr/bin/env python3 survey_output.py "$@"

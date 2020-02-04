@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <_name>Survex file</_name>
-  <id>org.patrickbwarren.output.svx</id>
+  <_name>Therion .th file</_name>
+  <id>org.patrickbwarren.output.th</id>
   <dependency type="executable" location="extensions">survey_output.py</dependency>
-  <param name="introduction" type="description">Export paths as survex file.</param>
+  <param name="introduction" type="description">Export paths as Therion .th file.</param>
   <param name="tab" type="notebook">
     <page name="Parameters" _gui-text="Parameters">
       <param name="scale" type="float" precision="2" min="0" max="9999" _gui-text="Length of scale line (in m)">100.00</param>
@@ -36,12 +36,12 @@
     </page>
   </param>
   <output>
-    <extension>.svx</extension>
-    <mimetype>application/x-survex-svx</mimetype>
-    <_filetypename>Survex file (*.svx)</_filetypename>
-    <_filetypetooltip>Export paths to survex file</_filetypetooltip>
+    <extension>.th</extension>
+    <mimetype>application/x-therion-th</mimetype>
+    <_filetypename>Therion file (*.th)</_filetypename>
+    <_filetypetooltip>Export paths to Therion .th file</_filetypetooltip>
   </output>
   <script>
-    <command reldir="extensions" interpreter="shell">svx_output.sh</command>
+    <command reldir="extensions" interpreter="shell">th_output.sh</command>
   </script>
 </inkscape-extension>

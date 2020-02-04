@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-svx_output.py
-Python script for exporting survex (.svx) file from Inkscape
+survey_output.py
+Python script for exporting survex (.svx) files or therion (.th) files
+from Inkscape
 
 Copyright (C) 2015 Patrick B Warren (original)
           (C) 2020 Andrew McLeod (modifications)
 
 Email: patrickbwarren@gmail.com
+       andrewclimbing@gmail.com
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -160,7 +162,7 @@ class SurvexOutput(SurveyOutput):
     END_SURVEY = '*end '
     SURVEY_HEADER = '*data normal from to tape compass clino'
     SURVEY_FOOTER = None
-    EQUATE_FORMAT = ('*equate {survey1}.{station1} {survey2}.{station2}'
+    EQUATE_FORMAT = ('*equate {survey1}.{station1} {survey2}.{station2}  '
                      + '; separation {separation:0.2f} m')
 
     def _write_exports(self, exports):
@@ -178,22 +180,12 @@ class TherionOutput(SurveyOutput):
     SURVEY_HEADER = (
         f'centerline\ndata normal from to tape compass clino')
     SURVEY_FOOTER = 'endcenterline'
-    EQUATE_FORMAT = ('equate {station1}@{survey1} {station2}@{survey2}'
+    EQUATE_FORMAT = ('equate {station1}@{survey1} {station2}@{survey2}  '
                      + '# separation {separation:0.2f} m')
 
     def _write_exports(self, exports):
         """Therion does not accept exports, so return."""
         pass
-
-
-def sprintd(b):
-    "Takes a bearing and returns it as string in 000 format"
-    while b < 0:
-        b += 360
-    b = int(b + 0.5)
-    while b >= 360:
-        b -= 360
-    return f'{b:03}'
 
 
 def distance(p1, p2):
@@ -250,6 +242,9 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
     def add_arguments(self, pars):
         pars.add_argument('--tab', type=str, dest='tab', default='',
                           help='Dummy argument')
+
+        pars.add_argument('--therion', action='store_true',
+                          help='Output Therion .th file format')
 
         pars.add_argument('--scale', type=float, dest='scale', default='100.0',
                           help='Length of scale bar (in m)')
@@ -662,7 +657,10 @@ class SurvexOutputExtension(inkex.extensions.OutputExtension):
 
         # If we made it this far we're ready to write the survex file
 
-        survey_outputter = SurvexOutput(stream, toplevel)
+        if self.options.therion:
+            survey_outputter = TherionOutput(stream, toplevel)
+        else:
+            survey_outputter = SurvexOutput(stream, toplevel)
 
         survey_outputter.add_equates(equates)
 
